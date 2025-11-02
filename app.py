@@ -1,78 +1,54 @@
 import streamlit as st
+import cv2
+import numpy as np
 from PIL import Image
-import os
-import io
-import time
+from model import detect_emotion, get_all_emotions, EMOTION_EMOJI
 
-# Import the core detection logic, which also initializes the database
-from model import detect_emotion, EMOTION_EMOJI, get_all_emotions
+st.set_page_config(page_title="Emotion Detection Web App", page_icon="😊", layout="centered")
 
-# --- CONFIGURATION ---
-st.set_page_config(
-    page_title="Facial Emotion Detection",
-    layout="centered",
-    initial_sidebar_state="expanded",
+st.title("🎭 Emotion Detection System")
+st.markdown(
+    """
+    Upload an image and the system will predict the **dominant emotion** displayed.
+    This version uses **EmotiEffLib (v1.1.1)** for fast and lightweight emotion recognition.
+    """
 )
 
-# --- CACHING AND UTILITIES ---
+# Sidebar info
+st.sidebar.title("About")
+st.sidebar.info(
+    """
+    **Developer:** Olubadejo Folajuwon  
+    **Library:** EmotiEffLib v1.1.1  
+    **Framework:** Streamlit  
+    """
+)
 
-# To avoid re-running the main logic on every interaction
-@st.cache_data
-def load_emotions():
-    return get_all_emotions()
+# File uploader
+uploaded_file = st.file_uploader("📸 Upload an Image", type=["jpg", "jpeg", "png"])
 
-# --- STREAMLIT APP LAYOUT ---
+if uploaded_file is not None:
+    # Display uploaded image
+    st.image(uploaded_file, caption="Uploaded Image", use_container_width=True)
 
-def main():
-    st.title(f"Emotion Detection Web App {EMOTION_EMOJI.get('happy', '')}")
-    st.markdown("---")
+    # Convert uploaded file to OpenCV image
+    image = Image.open(uploaded_file).convert("RGB")
+    img_array = np.array(image)
+    img_bgr = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
 
-    st.header("Upload an Image")
-    uploaded_file = st.file_uploader(
-        "Choose a high-quality image of a face...",
-        type=["jpg", "jpeg", "png"]
-    )
+    with st.spinner("Detecting emotion... ⏳"):
+        emotion, confidence = detect_emotion(img_bgr)
 
-    if uploaded_file is not None:
-        # Create a temporary file path to pass to DeepFace
-        temp_file_path = f"temp_{int(time.time())}_{uploaded_file.name}"
-        
-        # 1. Save the uploaded file to disk
-        try:
-            with open(temp_file_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            
-            # 2. Display the uploaded image
-            st.image(temp_file_path, caption='Uploaded Image', use_column_width=True)
-            
-            # 3. Process the image
-            with st.spinner('Analyzing emotion...'):
-                dominant_emotion, confidence = detect_emotion(temp_file_path)
-            
-            st.success("Analysis Complete!")
-            
-            # 4. Display results
-            if dominant_emotion != "Error":
-                emoji = EMOTION_EMOJI.get(dominant_emotion, '❓')
-                st.subheader(f"Result: {emoji} {dominant_emotion.upper()}")
-                st.info(f"Confidence: **{confidence:.2f}%**")
-                
-            else:
-                st.error("Could not process the image. Ensure a face is clearly visible.")
-
-        except Exception as e:
-            st.error(f"An unexpected error occurred during processing: {e}")
-            
-        finally:
-            # 5. Clean up the temporary file
-            if os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
-
+    if emotion != "Error":
+        st.success(f"**Emotion:** {emotion.capitalize()} {EMOTION_EMOJI.get(emotion, '')}")
+        st.write(f"**Confidence:** {confidence:.2f}")
     else:
-        st.info("Upload an image to start the facial emotion detection.")
-    
-    st.markdown("---")
-    st.caption("Project built using DeepFace and Streamlit, satisfying the assignment requirements.")
+        st.error("Could not detect emotion. Please try another image.")
 
-if __name__ == "__main__":
-    main()
+else:
+    st.info("Please upload an image to begin.")
+
+# Optional: show supported emotions
+st.markdown("---")
+st.subheader("Supported Emotions")
+st.write(", ".join([f"{emo.capitalize()} {EMOTION_EMOJI[emo]}" for emo in get_all_emotions()]))
