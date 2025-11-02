@@ -1,4 +1,4 @@
 streamlit
-deepface
+deepface==0.0.78
 opencv-python-headless
 Pillow
