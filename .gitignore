@@ -1,0 +1,11 @@
+# Ignore compiled Python files
+__pycache__/
+
+# Ignore database file
+emotion_detection.db
+
+# Ignore temporary files created by the app
+temp_*.png
+
+# Ignore files created by deepface
+.deepface/
