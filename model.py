@@ -1,46 +1,47 @@
-from emotiefflib import EmotiEff
-import cv2
+import argparse
+import os
 import numpy as np
+from PIL import Image
+from facenet_pytorch import MTCNN
+from emotiefflib.facial_analysis import EmotiEffLibRecognizer, get_model_list
 
-# Initialize the model
-model = EmotiEff()
 
-# Define supported emotions (you can adjust this depending on what the library supports)
-EMOTION_EMOJI = {
-    "happy": "😄",
-    "sad": "😢",
-    "angry": "😠",
-    "surprise": "😲",
-    "neutral": "😐",
-    "fear": "😨",
-    "disgust": "🤢"
-}
+def detect_faces(image: np.ndarray, device: str) -> list:
+    mtcnn = MTCNN(keep_all=True, device=device)
+    boxes, _ = mtcnn.detect(image)
+    faces = []
+    if boxes is not None:
+        for box in boxes:
+            x1, y1, x2, y2 = [int(v) for v in box[:4]]
+            if x2 - x1 > 0 and y2 - y1 > 0:
+                faces.append(image[y1:y2, x1:x2, :])
+    return faces
 
-def get_all_emotions():
-    """Return a list of supported emotions."""
-    return list(EMOTION_EMOJI.keys())
 
-def detect_emotion(img):
-    """
-    Detect emotion from an image (numpy array or path).
-    Returns (emotion, confidence)
-    """
-    try:
-        # Ensure the image is in RGB format
-        if isinstance(img, np.ndarray):
-            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        else:
-            raise ValueError("Expected numpy array for image input.")
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--image", required=True)
+    parser.add_argument("--model", default=get_model_list()[0])
+    parser.add_argument("--device", default="cpu")
+    args = parser.parse_args()
+    if not os.path.isfile(args.image):
+        raise FileNotFoundError(args.image)
+    img = Image.open(args.image).convert("RGB")
+    img_np = np.array(img)
+    faces = detect_faces(img_np, args.device)
+    if not faces:
+        print("No faces detected.")
+        return
+    recognizer = EmotiEffLibRecognizer(engine="torch", model_name=args.model, device=args.device)
+    features = recognizer.extract_features(faces)
+    labels, scores = recognizer.classify_emotions(features, logits=False)
+    for i, lbl in enumerate(labels):
+        idx_map = recognizer.idx_to_emotion_class
+        inv_map = {v: k for k, v in idx_map.items()}
+        idx = inv_map[lbl]
+        conf = float(scores[i][idx])
+        print(f"face={i} label={lbl} confidence={conf:.4f}")
 
-        # Run prediction using EmotiEff
-        result = model.predict(img_rgb)
 
-        # Extract emotion and confidence
-        emotion = result["emotion"]
-        confidence = result["confidence"]
-
-        return emotion.lower(), confidence
-
-    except Exception as e:
-        print("Error detecting emotion:", e)
-        return "Error", 0.0
+if __name__ == "__main__":
+    main()

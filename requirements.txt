@@ -1,6 +1,8 @@
 streamlit
-emotiefflib
-opencv-python-headless
-Pillow
+emotiefflib[torch]
+facenet-pytorch
+torch
+torchvision
+pillow
 numpy
-pandas
+opencv-python-headless
