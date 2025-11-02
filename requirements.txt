@@ -1,5 +1,6 @@
 streamlit
 deepface==0.0.78
 opencv-python
-opencv-python-headless
+requests
+numpy==1.26.4
 Pillow
