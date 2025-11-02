@@ -96,34 +96,45 @@ def main() -> None:
         page_icon="😊",
         layout="centered",
     )
-    st.title("Emotion Detection App")
-    st.write(
-        "Predict a person's emotion from a photograph using a pre-trained EmotiEffLib model."
+    # Inject dark theme CSS: black background, white text
+    st.markdown(
+        """
+        <style>
+        /* Page background and text */
+        .stApp, .block-container, body {
+            background-color: #000000 !important;
+            color: #FFFFFF !important;
+        }
+        /* Headings and markdown */
+        h1, h2, h3, h4, h5, h6, .css-18e3th9 { color: #FFFFFF !important; }
+        /* Streamlit widgets */
+        .stButton>button, .stTextInput>div>div>input, .stFileUploader, .stSelectbox, .stCheckbox>div, .stRadio>div {
+            background-color: #111111 !important;
+            color: #FFFFFF !important;
+        }
+        /* Make images stand out on dark bg */
+        .stImage>div>img { filter: brightness(1.05); }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
+
+    st.title("Emotion Detection App")
+    st.write("Predict a person's emotion from a photograph using a pre-trained EmotiEffLib model.")
     conn = init_database()
     name = st.text_input("Your name", max_chars=50)
     device = "cuda" if st.checkbox("Use GPU if available") else "cpu"
     model_name = st.selectbox("Model", get_model_list(), index=0)
     recognizer = EmotiEffLibRecognizer(engine="torch", model_name=model_name, device=device)
-    mode = st.radio(
-        "Select input method:", ("Upload Image", "Capture from Webcam")
-    )
+    # Only allow image upload (webcam capture removed by user request)
     image: Optional[np.ndarray] = None
     raw_bytes: Optional[bytes] = None
-    if mode == "Upload Image":
-        uploaded_file = st.file_uploader("Upload a face image", type=["jpg", "jpeg", "png"])
-        if uploaded_file is not None:
-            raw_bytes = uploaded_file.getvalue()
-            st.image(uploaded_file, caption="Uploaded image", use_column_width=True)
-            pil_img = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
-            image = np.array(pil_img)
-    else:
-        picture = st.camera_input("Take a photo")
-        if picture is not None:
-            raw_bytes = picture.getvalue()
-            st.image(picture, caption="Captured image", use_column_width=True)
-            pil_img = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
-            image = np.array(pil_img)
+    uploaded_file = st.file_uploader("Upload a face image", type=["jpg", "jpeg", "png"])  
+    if uploaded_file is not None:
+        raw_bytes = uploaded_file.getvalue()
+        st.image(uploaded_file, caption="Uploaded image", use_column_width=True)
+        pil_img = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
+        image = np.array(pil_img)
     if image is not None and raw_bytes is not None and name:
         face = detect_first_face(image, device)
         if face is None:
@@ -133,7 +144,8 @@ def main() -> None:
             st.success(f"Predicted Emotion: {emotion} (confidence: {confidence:.2f})")
             if st.button("Save result"):
                 save_result(conn, name, raw_bytes, emotion, confidence)
-                st.toast("Result saved to database.")
+                # Use a stable Streamlit message instead of toast for compatibility
+                st.info("Result saved to database.")
     render_history(conn)
 
 
